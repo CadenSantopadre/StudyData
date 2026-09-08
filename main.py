@@ -110,11 +110,11 @@ for variable in variables:
     sd1, sd2, ratio, r = poincare_metrics(df[variable], lag)
 
     print(
-        f"{variable:<12}"
+        f"{variable:<12}   " #Add extra spaces so its not clustered
         f"SD1={sd1:.3f}   "
         f"SD2={sd2:.3f}   "
         f"SD1/SD2={ratio:.3f}   "
-        f"r={r:.3f}"
+        f"r={r:.3f}   "
     )
 
 lagged_pairs = [
@@ -141,7 +141,7 @@ for x_var, y_var in lagged_pairs:
     )
 
     print(
-        f"{x_var} → {y_var} tomorrow: "
+        f"{x_var} -> {y_var} tomorrow: "
         f"r={r:.3f}, p={p:.4f}"
     )
 
@@ -205,3 +205,5 @@ for i, var in enumerate(variables):
 plt.tight_layout()
 plt.show()
 
+#Next steps is making a vector field
+#And doing stress_t vs. Hours t+1 given it's large r value stress -> hours tomorrow has r=0.804
