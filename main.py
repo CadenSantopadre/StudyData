@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
-from statsmodels.tsa.stattools import acf
 from statsmodels.graphics.tsaplots import plot_acf
+import statsmodels.api as sm
 
 df = pd.read_csv("study.csv")
 lag = 1
 window_size = 3
 
-variables = [
+variables = [ 
     "Hours",
     "Velocity",
     "Happiness",
@@ -49,18 +49,20 @@ for row in variables:
             
         
         row_str += f"{color}{val:>11.4f}{RESET} "
-        
-    print(row_str)
+    print(row_str) 
 print("--------------------------------------------")
 
 
-fig, axes = plt.subplots(1, len(variables), figsize=(len(variables) * 5, 5))
+#------------------------------------------------------
+#                        PLOTS
+#------------------------------------------------------
+fig, axes = plt.subplots(1, len(variables), figsize=(len(variables) * 5, 5)) 
 axes = np.array(axes).flatten()
 
-for i, variable in enumerate(variables):
+for i, variable in enumerate(variables): 
     ax = axes[i]
     x = df[variable]
-    y = df[variable].shift(-1)
+    y = df[variable].shift(-lag)
 
     ax.scatter(x, y)
 
@@ -70,10 +72,8 @@ for i, variable in enumerate(variables):
 
     m, b = np.polyfit(x.drop(df.tail(1).index), y.dropna(), 1)
     
-
     x_line = np.array([np.min(x), np.max(x)])
     y_line = m * x_line + b
-    
     
     ax.plot(x_line, y_line, color="red", linestyle="-")
 
@@ -84,7 +84,7 @@ for i, variable in enumerate(variables):
 plt.show()
 
 def poincare_metrics(series, lag=1):
-    x = series.dropna().values
+    x = series.to_numpy()
 
     x1 = x[:-lag]
     x2 = x[lag:]
@@ -93,16 +93,14 @@ def poincare_metrics(series, lag=1):
 
     sd1 = np.sqrt(0.5 * np.var(differences, ddof=1))
 
-    sd2 = np.sqrt(
-        2 * np.var(x, ddof=1)
-        - 0.5 * np.var(differences, ddof=1)
-    )
+    sd2 = np.sqrt(2 * np.var(x, ddof=1)- 0.5 * np.var(differences, ddof=1))
 
-    ratio = sd1 / sd2
-
+    ratio = sd2 / sd1
+    
     r = np.corrcoef(x1, x2)[0, 1]
 
     return sd1, sd2, ratio, r
+
 
 print("\n------------- POINCARE METRICS -------------")
 
@@ -110,7 +108,7 @@ for variable in variables:
     sd1, sd2, ratio, r = poincare_metrics(df[variable], lag)
 
     print(
-        f"{variable:<12}   " #Add extra spaces so its not clustered
+        f"{variable:<12}   "
         f"SD1={sd1:.3f}   "
         f"SD2={sd2:.3f}   "
         f"SD1/SD2={ratio:.3f}   "
@@ -118,31 +116,49 @@ for variable in variables:
     )
 
 lagged_pairs = [
-    ("Hours", "Stress"),
+    ("Hours", "Hours"),
+    ("Velocity", "Velocity"),
+    ("Happiness", "Happiness"),
+    ("Stress", "Stress"),
+    
+
+    ("Hours", "Velocity"),
     ("Hours", "Happiness"),
-    ("Stress", "Hours"),
-    ("Happiness", "Hours"),
+    ("Hours", "Stress"),
+    
+    ("Velocity", "Hours"),
+    ("Velocity", "Happiness"),
     ("Velocity", "Stress"),
-    ("Velocity", "Happiness")
+    
+    ("Happiness", "Hours"),
+    ("Happiness", "Velocity"),
+    ("Happiness", "Stress"),
+    
+    ("Stress", "Hours"),
+    ("Stress", "Velocity"),
+    ("Stress", "Happiness")
 ]
 
+
 print("\n------------- LAGGED CORRELATIONS -------------")
-
+threshold = 0.45
 for x_var, y_var in lagged_pairs:
-
     x = df[x_var]
     y = df[y_var].shift(-1)
-
     data = pd.concat([x, y], axis=1).dropna()
+    r, p = stats.pearsonr(data.iloc[:, 0], data.iloc[:, 1])
 
-    r, p = stats.pearsonr(
-        data.iloc[:, 0],
-        data.iloc[:, 1]
-    )
+    if r >= threshold:
+        color = GREEN
+    elif r <= -threshold:
+        color = RED
+    else:
+        color = RESET
 
     print(
-        f"{x_var} -> {y_var} tomorrow: "
-        f"r={r:.3f}, p={p:.4f}"
+        f"{x_var:<8} -> {y_var:<10} tomorrow: "
+        f"{color}r={r:>6.3f}{RESET}, "
+        f"p={p:.4f}"
     )
 
 x = df["Hours"]
@@ -205,5 +221,73 @@ for i, var in enumerate(variables):
 plt.tight_layout()
 plt.show()
 
-#Next steps is making a vector field
-#And doing stress_t vs. Hours t+1 given it's large r value stress -> hours tomorrow has r=0.804
+x = df['Stress']
+y = df['Hours'].shift(-1)
+
+slope, intercept, r, p, se = stats.linregress(x.drop(df.tail(1).index), y.dropna())
+
+
+plt.figure(figsize=(7, 5))
+
+plt.scatter(x, y)
+
+plt.plot(
+    x,
+    intercept + slope * x,
+    linestyle="--"
+)
+
+plt.xlabel("Stress")
+plt.ylabel("Hours(t+1)")
+plt.title(f"Stress v. Hours(t+1) (r = {r:.2f})")
+plt.grid(True)
+plt.show()
+
+
+
+df['d-stress'] = df["Stress"].shift(-1) - df['Stress']
+df['d-hours'] = df["Hours"].shift(-1) - df['Hours']
+
+plt.figure(figsize=(8,6))
+
+plt.quiver(df['Stress'].iloc[:-1], df['Hours'].iloc[:-1], 
+           df['d-stress'].iloc[:-1], df['d-hours'].iloc[:-1], 
+           angles='xy', scale_units='xy', scale=1, color='blue', alpha=0.6, label='System Vector Field')
+plt.scatter(df['Stress'], df['Hours'], color='black')
+plt.title("Phase Space Vector Field: (Stress_t, Hours_t) Multi-Day Dynamics")
+plt.xlabel("Stress (t)")
+plt.ylabel("Hours (t)")
+plt.grid(True)
+plt.legend()
+plt.show()
+
+X = df[variables]
+Y = df["Hours"].shift(-1)
+
+
+X = X.iloc[:-1]
+Y = Y.iloc[:-1]
+
+
+X = sm.add_constant(X)
+
+
+model = sm.OLS(Y, X).fit()
+print("\n------------------ OLS REGRESSION RESULTS ------------------")
+print(model.summary())
+
+latest_day = df.iloc[-1]
+intercept = model.params['const']
+
+predicted_tomorrow = (
+    intercept +
+    (model.params['Hours'] * latest_day['Hours']) +
+    (model.params['Velocity'] * latest_day['Velocity']) +
+    (model.params['Happiness'] * latest_day['Happiness']) +
+    (model.params['Stress'] * latest_day['Stress'])
+)
+
+print("\n------------------------TOMORROW PREDICTION---------------------------")
+print(f"Based on today's state, you are mathematically on track to study:")
+print(f"{predicted_tomorrow:.2f} hours tomorrow.")
+print("-----------------------------------------------------------------------")
