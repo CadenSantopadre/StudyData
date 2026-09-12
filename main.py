@@ -6,7 +6,7 @@ from statsmodels.graphics.tsaplots import plot_acf
 import statsmodels.api as sm
 
 df = pd.read_csv("study.csv")
-lag = 1
+base_lag = 1
 window_size = 3
 
 variables = [ 
@@ -20,37 +20,56 @@ print("------------------STATS---------------------")
 print(df[variables].describe())
 
 
-print("------------------CORR----------------------")
-corr_matrix = df[variables].corr(method="pearson")
-
-
+max_lag = 3
 GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
 threshold = 0.4
-
-header_row = f"{'':<12}" + "".join([f"{var:<12}" for var in variables])
-print(header_row)
-
-
-for row in variables:
-    row_str = f"{row:<12}"
-    for col in variables:
-        val = corr_matrix.loc[row, col]
-        
-        if row == col:
-            color = RESET
-        elif val >= threshold:
-            color = GREEN
-        elif val <= -threshold:
-            color = RED
-        else:
-            color = RESET
+for lag in range(max_lag + 1):
+    print(f"\n------------------ LAGGED CORR (Lag = {lag}) ------------------")
+    
+    # 1. Create a dictionary to hold the lagged correlations
+    lagged_corr_dict = {}
+    
+    for row in variables:
+        lagged_corr_dict[row] = {}
+        for col in variables:
+            # Shift the 'col' variable by the current lag
+            # This correlates row(t) with col(t - lag)
+            val = df[row].corr(df[col].shift(lag), method="pearson")
+            lagged_corr_dict[row][col] = val
             
-        
-        row_str += f"{color}{val:>11.4f}{RESET} "
-    print(row_str) 
-print("--------------------------------------------")
+    # Convert the dictionary into a DataFrame for easy lookup
+    corr_matrix = pd.DataFrame(lagged_corr_dict).T
+    
+    # 2. Print the matrix using your formatting code
+    header_row = f"{'':<12}" + "".join([f"{var:<12}" for var in variables])
+    print(header_row)
+    
+    for row in variables:
+        row_str = f"{row:<12}"
+        for col in variables:
+            val = corr_matrix.loc[row, col]
+            
+            # Handle NaN values gracefully if shifting creates empty rows
+            if pd.isna(val):
+                row_str += f"{RESET}{'NaN':>11} "
+                continue
+            
+            # Note: For lag > 0, row == col is no longer a self-correlation,
+            # so we check if lag == 0 for the diagonal RESET rule.
+            if lag == 0 and row == col:
+                color = RESET
+            elif val >= threshold:
+                color = GREEN
+            elif val <= -threshold:
+                color = RED
+            else:
+                color = RESET
+                
+            row_str += f"{color}{val:>11.4f}{RESET} "
+        print(row_str) 
+    print("------------------------------------------------------------")
 
 
 #------------------------------------------------------
@@ -62,7 +81,7 @@ axes = np.array(axes).flatten()
 for i, variable in enumerate(variables): 
     ax = axes[i]
     x = df[variable]
-    y = df[variable].shift(-lag)
+    y = df[variable].shift(-base_lag)
 
     ax.scatter(x, y)
 
@@ -78,16 +97,16 @@ for i, variable in enumerate(variables):
     ax.plot(x_line, y_line, color="red", linestyle="-")
 
     ax.set_xlabel("t")
-    ax.set_ylabel(f"t + {lag}")
+    ax.set_ylabel(f"t + {base_lag}")
     ax.set_title(f"Poincare: {variable}")
     ax.grid(True)
 plt.show()
 
-def poincare_metrics(series, lag=1):
+def poincare_metrics(series, base_lag=1):
     x = series.to_numpy()
 
-    x1 = x[:-lag]
-    x2 = x[lag:]
+    x1 = x[:-base_lag]
+    x2 = x[base_lag:]
 
     differences = x2 - x1
 
@@ -105,7 +124,7 @@ def poincare_metrics(series, lag=1):
 print("\n------------- POINCARE METRICS -------------")
 
 for variable in variables:
-    sd1, sd2, ratio, r = poincare_metrics(df[variable], lag)
+    sd1, sd2, ratio, r = poincare_metrics(df[variable], base_lag)
 
     print(
         f"{variable:<12}   "
@@ -260,34 +279,27 @@ plt.ylabel("Hours (t)")
 plt.grid(True)
 plt.legend()
 plt.show()
-
-X = df[variables]
-Y = df["Hours"].shift(-1)
-
-
-X = X.iloc[:-1]
-Y = Y.iloc[:-1]
-
-
-X = sm.add_constant(X)
-
-
-model = sm.OLS(Y, X).fit()
-print("\n------------------ OLS REGRESSION RESULTS ------------------")
-print(model.summary())
+print("\n------------------------TOMORROW PREDICTIONS---------------------------")
+print("Based on today's state, you are mathematically on track for:")
 
 latest_day = df.iloc[-1]
-intercept = model.params['const']
 
-predicted_tomorrow = (
-    intercept +
-    (model.params['Hours'] * latest_day['Hours']) +
-    (model.params['Velocity'] * latest_day['Velocity']) +
-    (model.params['Happiness'] * latest_day['Happiness']) +
-    (model.params['Stress'] * latest_day['Stress'])
-)
+for target_var in variables:
+    X = df[variables].iloc[:-1]
+    Y = df[target_var].shift(-1).iloc[:-1]
+    
+    X = sm.add_constant(X)
+    
+    model = sm.OLS(Y, X).fit()
+    
+    if target_var == "Hours":
+        print("\n------------------ OLS REGRESSION RESULTS (HOURS) ------------------")
+        print(model.summary())
+        print("--------------------------------------------------------------------\n")
 
-print("\n------------------------TOMORROW PREDICTION---------------------------")
-print(f"Based on today's state, you are mathematically on track to study:")
-print(f"{predicted_tomorrow:.2f} hours tomorrow.")
+    intercept = model.params['const']
+    predicted_tomorrow = intercept + sum(model.params[var] * latest_day[var] for var in variables)
+    
+    print(f"{predicted_tomorrow:.2f} {target_var.lower()} tomorrow")
+
 print("-----------------------------------------------------------------------")

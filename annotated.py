@@ -320,88 +320,66 @@ plt.show()
 
 
 #------------------------------------------------------
-#                      OLS MODEL
+# OLS MODEL (LOOPED)
 #------------------------------------------------------
-#I use capitals since it's like a matrix
-X = df[variables]
-Y = df["Hours"].shift(-1)
-
-#Kill last row so there's no nans
-X = X.iloc[:-1]
-Y = Y.iloc[:-1]
-
-#Add baseline
-X = sm.add_constant(X)
-
-#bam run the model; dunno why y and x are flipped though
-model = sm.OLS(Y, X).fit()
-print("\n------------------ OLS REGRESSION RESULTS ------------------")
-print(model.summary())
+print("\n------------------------TOMORROW PREDICTIONS---------------------------")
+print("Based on today's state, you are mathematically on track for:")
 
 latest_day = df.iloc[-1]
-intercept = model.params['const']
 
-predicted_tomorrow = (
-    intercept +
-    (model.params['Hours'] * latest_day['Hours']) +
-    (model.params['Velocity'] * latest_day['Velocity']) +
-    (model.params['Happiness'] * latest_day['Happiness']) +
-    (model.params['Stress'] * latest_day['Stress'])
-)
+for target_var in variables:
+    X = df[variables].iloc[:-1]
+    Y = df[target_var].shift(-1).iloc[:-1]
+    
+    X = sm.add_constant(X)
+    
+    model = sm.OLS(Y, X).fit()
+    
+    if target_var == "Hours":
+        print("\n------------------ OLS REGRESSION RESULTS (HOURS) ------------------")
+        print(model.summary())
+        print("--------------------------------------------------------------------\n")
 
-print("\n------------------------TOMORROW PREDICTION---------------------------")
-print(f"Based on today's state, you are mathematically on track to study:")
-print(f"{predicted_tomorrow:.2f} hours tomorrow.")
-
-X = df[variables]
-Y = df["Happiness"].shift(-1)
-
-#Kill last row so there's no nans
-X = X.iloc[:-1]
-Y = Y.iloc[:-1]
-
-#Add baseline
-X = sm.add_constant(X)
-
-#bam run the model; dunno why y and x are flipped though
-model = sm.OLS(Y, X).fit()
-
-latest_day = df.iloc[-1]
-intercept = model.params['const']
-
-predicted_tomorrow = (
-    intercept +
-    (model.params['Hours'] * latest_day['Hours']) +
-    (model.params['Velocity'] * latest_day['Velocity']) +
-    (model.params['Happiness'] * latest_day['Happiness']) +
-    (model.params['Stress'] * latest_day['Stress'])
-)
-print(f"{predicted_tomorrow:.2f} happiness tomorrow")
-
-X = df[variables]
-Y = df["Stress"].shift(-1)
-
-#Kill last row so there's no nans
-X = X.iloc[:-1]
-Y = Y.iloc[:-1]
-
-#Add baseline
-X = sm.add_constant(X)
-
-#bam run the model; dunno why y and x are flipped though
-model = sm.OLS(Y, X).fit()
-
-latest_day = df.iloc[-1]
-intercept = model.params['const']
-
-predicted_tomorrow = (
-    intercept +
-    (model.params['Hours'] * latest_day['Hours']) +
-    (model.params['Velocity'] * latest_day['Velocity']) +
-    (model.params['Happiness'] * latest_day['Happiness']) +
-    (model.params['Stress'] * latest_day['Stress'])
-)
-print(f"{predicted_tomorrow:.2f} stress tomorrow")
-
+    intercept = model.params['const']
+    predicted_tomorrow = intercept + sum(model.params[var] * latest_day[var] for var in variables)
+    
+    print(f"{predicted_tomorrow:.2f} {target_var.lower()} tomorrow")
 
 print("-----------------------------------------------------------------------")
+
+
+# Create empty structures for our matrix components
+intercepts = []
+coef_matrix = []
+
+# Order of variables must match exactly
+ordered_vars = ["Hours", "Velocity", "Happiness", "Stress"]
+
+for target_var in ordered_vars:
+    X = df[ordered_vars].iloc[:-1]
+    Y = df[target_var].shift(-1).iloc[:-1]
+    X = sm.add_constant(X)
+    model = sm.OLS(Y, X).fit()
+    
+    # Save the intercept (\beta_0)
+    intercepts.append(model.params['const'])
+    
+    # Save the row of coefficients (\beta_1, \beta_2, \beta_3, \beta_4)
+    row_coefs = [model.params[var] for var in ordered_vars]
+    coef_matrix.append(row_coefs)
+
+# Convert to NumPy arrays
+B = np.array(coef_matrix)
+c = np.array(intercepts)
+I = np.eye(4)
+
+try:
+    # Solve (I - B)x = c for x
+    steady_state = np.linalg.solve(I - B, c)
+    
+    print("\n---------------- MATHEMATICAL STEADY STATE ----------------")
+    for var, val in zip(ordered_vars, steady_state):
+        print(f"Optimal Steady-State {var:<10}: {val:.2f}")
+    print("-----------------------------------------------------------")
+except np.linalg.LinAlgError:
+    print("\n[System Error]: The system has no unique steady state (Matrix is singular).")
