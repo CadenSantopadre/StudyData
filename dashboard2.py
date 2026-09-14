@@ -1600,7 +1600,6 @@ class StudyDashboard(QMainWindow):
             [
                 "Linear",
                 "Polynomial",
-                "Compare linear and polynomial",
             ]
         )
 
@@ -1788,20 +1787,24 @@ class StudyDashboard(QMainWindow):
             ] = metrics["R²"]
 
         if plot_type == "Actual vs predicted":
-            first_model_name = (
-                list(models_to_evaluate.keys())[0]
-            )
+            # If the user chose to compare, you might want to plot the Polynomial model 
+            # (which changes with degrees) or loop through and plot both.
+            if selected_model == "Compare linear and polynomial":
+                # Option A: Default to displaying the dynamic Polynomial model on the graph
+                model_to_plot = "Polynomial"
+            else:
+                model_to_plot = selected_model
 
-            first_model = models_to_evaluate[
-                first_model_name
-            ]
+            if model_to_plot in models_to_evaluate:
+                chosen_model = models_to_evaluate[model_to_plot]
+                
+                self.canvas.draw_actual_vs_predicted(
+                    test_Y,
+                    chosen_model["predictions"],
+                    self.variables,
+                    f"Validation: {model_to_plot}",
+                )
 
-            self.canvas.draw_actual_vs_predicted(
-                test_Y,
-                first_model["predictions"],
-                self.variables,
-                f"Validation: {first_model_name}",
-            )
 
         self.current_validation_result = {
             "train": train_df,
