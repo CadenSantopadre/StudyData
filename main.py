@@ -100,7 +100,7 @@ for i, variable in enumerate(variables):
     ax.set_ylabel(f"t + {base_lag}")
     ax.set_title(f"Poincare: {variable}")
     ax.grid(True)
-plt.show()
+#plt.show()
 
 def poincare_metrics(series, base_lag=1):
     x = series.to_numpy()
@@ -201,7 +201,7 @@ plt.xlabel("Study hours")
 plt.ylabel("Stress")
 plt.title(f"Study Time vs Stress (r = {r:.2f})")
 plt.grid(True)
-plt.show()
+#plt.show()
 
 x = df["Velocity"]
 y = df["Stress"]
@@ -224,7 +224,7 @@ plt.xlabel("Velocity")
 plt.ylabel("Stress")
 plt.title(f"Velocity vs Stress (r = {r:.2f})")
 plt.grid(True)
-plt.show()
+#plt.show()
 
 max_lags = len(df) - 1
 fig, axes = plt.subplots(1, len(variables), figsize=(18, 5))
@@ -238,7 +238,7 @@ for i, var in enumerate(variables):
     axes_flat[i].grid(True)
 
 plt.tight_layout()
-plt.show()
+#plt.show()
 
 x = df['Stress']
 y = df['Hours'].shift(-1)
@@ -260,7 +260,7 @@ plt.xlabel("Stress")
 plt.ylabel("Hours(t+1)")
 plt.title(f"Stress v. Hours(t+1) (r = {r:.2f})")
 plt.grid(True)
-plt.show()
+#plt.show()
 
 
 
@@ -278,7 +278,7 @@ plt.xlabel("Stress (t)")
 plt.ylabel("Hours (t)")
 plt.grid(True)
 plt.legend()
-plt.show()
+#plt.show()
 print("\n------------------------TOMORROW PREDICTIONS---------------------------")
 print("Based on today's state, you are mathematically on track for:")
 
