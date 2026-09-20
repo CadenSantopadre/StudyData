@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from scipy.stats import pearsonr
 
 # 1. Load data
 df = pd.read_csv("study.csv")
@@ -15,6 +17,11 @@ variables = [
 ]
 min_initial_days = 5  
 degrees = {"Linear": 1, "Poly Order 2": 2, "Poly Order 3": 3}
+
+prediction_metrics = {
+        var: {name: {} for name in degrees}
+        for var in variables
+    }
 
 # Initialize tracking dictionaries
 all_errors = {var: {name: [] for name in degrees} for var in variables}
@@ -66,6 +73,32 @@ for target_var in variables:
             
     actuals = np.array(actuals_tracker)
     all_dates[target_var] = np.array(history_dates)
+
+    actuals = np.array(actuals_tracker)
+    all_dates[target_var] = np.array(history_dates)
+
+    for name in degrees:
+        preds = np.array(preds_tracker[name])
+
+        # RMSE
+        rmse = np.sqrt(mean_squared_error(actuals, preds))
+
+        #MAE
+        mae = mean_absolute_error(actuals, preds)
+
+        # Pearson correlation r
+        r, p_value = pearsonr(actuals, preds)
+
+        # R²
+        r2 = r2_score(actuals, preds)
+
+        prediction_metrics[target_var][name] = {
+            "RMSE": rmse,
+            "MAE": mae,
+            "r": r,
+            "R²": r2,
+            "p-value": p_value
+        }
     
     # 3. STATISTICAL OUTLIER DETECTION per model type using global IQR
     for name in degrees:
@@ -122,3 +155,19 @@ for name in degrees:
     plt.suptitle(f"Global Layout Analysis — {name} Configuration", fontsize=14, fontweight='bold', y=0.98)
     plt.tight_layout()
     plt.show()
+
+print("\n=== OUT-OF-SAMPLE PREDICTION PERFORMANCE ===")
+
+for target_var in variables:
+    print(f"\n{target_var}")
+    for name in degrees:
+        metrics = prediction_metrics[target_var][name]
+
+        print(
+            f"{name:15s} | "
+            f"RMSE = {metrics['RMSE']:.4f} | "
+            f"MAE = {metrics['MAE']:.4f} | "
+            f"r = {metrics['r']:.4f} | "
+            f"R² = {metrics['R²']:.4f} | "
+            f"p = {metrics['p-value']:.4f}"
+        )

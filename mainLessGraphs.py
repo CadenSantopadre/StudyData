@@ -170,29 +170,6 @@ for x_var, y_var in lagged_pairs:
         f"p={p:.4f}"
     )
 
-x = df["Hours"]
-y = df["Stress"]
-
-slope, intercept, r, p, se = stats.linregress( 
-    x,y
-)
-
-plt.figure(figsize=(7, 5))
-
-plt.scatter(x, y)
-
-plt.plot(
-    x,
-    intercept + slope * x,
-    linestyle="--"
-)
-
-plt.xlabel("Study hours")
-plt.ylabel("Stress")
-plt.title(f"Study Time vs Stress (r = {r:.2f})")
-plt.grid(True)
-#plt.show()
-
 x = df["Velocity"]
 y = df["Stress"]
 
@@ -216,59 +193,46 @@ plt.title(f"Velocity vs Stress (r = {r:.2f})")
 plt.grid(True)
 plt.show()
 
-max_lags = len(df) - 1
-fig, axes = plt.subplots(1, len(variables), figsize=(18, 5))
-axes_flat = axes.flatten()
-for i, var in enumerate(variables):
-    plot_acf(df[var], lags=max_lags, ax=axes[i])
-
-    axes_flat[i].set_title(f"ACF - {var}")
-    axes_flat[i].set_xlabel("Lags")
-    axes_flat[i].set_ylabel("Autocorrelation")
-    axes_flat[i].grid(True)
-
-plt.tight_layout()
-#plt.show()
-
-x = df['Stress']
-y = df['Hours'].shift(-1)
-
-slope, intercept, r, p, se = stats.linregress(x.drop(df.tail(1).index), y.dropna())
-
-
-plt.figure(figsize=(7, 5))
-
-plt.scatter(x, y)
-
-plt.plot(
-    x,
-    intercept + slope * x,
-    linestyle="--"
-)
-
-plt.xlabel("Stress")
-plt.ylabel("Hours(t+1)")
-plt.title(f"Stress v. Hours(t+1) (r = {r:.2f})")
-plt.grid(True)
-#plt.show()
-
-
 
 df['d-stress'] = df["Stress"].shift(-1) - df['Stress']
 df['d-hours'] = df["Hours"].shift(-1) - df['Hours']
 
-plt.figure(figsize=(8,6))
+X = df['Stress'].iloc[:-1].values
+Y = df['Hours'].iloc[:-1].values
+U = df['d-stress'].iloc[:-1].values
+V = df['d-hours'].iloc[:-1].values
 
-plt.quiver(df['Stress'].iloc[:-1], df['Hours'].iloc[:-1], 
-           df['d-stress'].iloc[:-1], df['d-hours'].iloc[:-1], 
-           angles='xy', scale_units='xy', scale=1, color='blue', alpha=0.6, label='System Vector Field')
-plt.scatter(df['Stress'], df['Hours'], color='black')
-plt.title("Phase Space Vector Field: (Stress_t, Hours_t) Multi-Day Dynamics")
+magnitude = np.sqrt(U**2 + V**2)
+magnitude_safe = np.where(magnitude == 0, 1, magnitude) 
+U_norm = U / magnitude_safe
+V_norm = V / magnitude_safe
+
+stride = 1
+X_s, Y_s, U_s, V_s, M_s = X[::stride], Y[::stride], U_norm[::stride], V_norm[::stride], magnitude[::stride]
+
+plt.figure(figsize=(10, 8))
+
+Q = plt.quiver(X_s, Y_s, U_s, V_s, M_s,
+               cmap='viridis',
+               angles='xy', 
+               scale=15,
+               pivot='tail', 
+               alpha=0.8)
+
+cbar = plt.colorbar(Q)
+cbar.set_label('Transition Magnitude (Speed)', rotation=270, labelpad=15)
+
+plt.plot(df['Stress'], df['Hours'], color='black', alpha=0.3, linestyle='--', label='Trajectory Path')
+plt.scatter(df['Stress'], df['Hours'], color='black', s=15, zorder=3)
+
+plt.title("Phase Space Vector Field: Normalized Multi-Day Dynamics")
 plt.xlabel("Stress (t)")
 plt.ylabel("Hours (t)")
-plt.grid(True)
+plt.grid(True, linestyle=':', alpha=0.6)
 plt.legend()
+plt.tight_layout()
 plt.show()
+
 print("\n------------------------TOMORROW PREDICTIONS---------------------------")
 print("Based on today's state, you are mathematically on track for:")
 
