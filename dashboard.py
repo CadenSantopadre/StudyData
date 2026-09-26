@@ -772,74 +772,68 @@ class PlotCanvas(FigureCanvas):
         x_min, x_max = np.min(x_values), np.max(x_values)
         y_min, y_max = np.min(y_values), np.max(y_values)
 
-        x_grid = np.linspace(
-            x_min,
-            x_max,
-            35,
-        )
-
-        y_grid = np.linspace(
-            y_min,
-            y_max,
-            35,
-        )
-
-        grid_x, grid_y = np.meshgrid(
-            x_grid,
-            y_grid,
-        )
+        x_grid = np.linspace(x_min, x_max, 35)
+        y_grid = np.linspace(y_min, y_max, 35)
+        grid_x, grid_y = np.meshgrid(x_grid, y_grid)
 
         base_state = dataframe[variables].mean().to_numpy()
 
+        # 1. ALWAYS populate the prediction inputs first
         prediction_inputs = []
-
         for x_value, y_value in zip(
             grid_x.reshape(-1),
             grid_y.reshape(-1),
         ):
             state = base_state.copy()
-
             state[variables.index(input_x)] = x_value
             state[variables.index(input_y)] = y_value
-
             prediction_inputs.append(state)
 
-        prediction_inputs = np.asarray(
-            prediction_inputs
-        )
+        prediction_inputs = np.asarray(prediction_inputs)
 
-        predictions = model.predict(
-            prediction_inputs
-        )
+        # 2. Now predictions will have a valid 2D array of coordinates to evaluate
+        predictions = model.predict(prediction_inputs)
 
-        output_index = variables.index(
-            output_variable
-        )
+        # 3. Handle splitting the prediction logic cleanly
+        if output_variable == "utility":
+            # Make sure these match your exact dataframe capitalization (e.g., 'Happiness' vs 'happiness')
+            hi = variables.index("Happiness")
+            si = variables.index("Stress")
+            pred_h = predictions[:, hi]
+            pred_s = predictions[:, si]
 
-        prediction_surface = predictions[
-            :, output_index
-        ].reshape(grid_x.shape)
+            prediction_surface = (pred_h - pred_s).reshape(grid_x.shape)
+            z_label_text = "Predicted Net Utility (Happiness - Stress)"
+            title_text = f"Predicted Utility Surface Map\nBased on {input_x} and {input_y}"
+            cmap_choice = "plasma"
 
+        else:
+            output_index = variables.index(output_variable)
+            prediction_surface = predictions[:, output_index].reshape(grid_x.shape)
+
+            z_label_text = f"Predicted next {output_variable}"
+            title_text = (
+                f"Polynomial response surface\n"
+                f"{output_variable} from {input_x} and {input_y}"
+            )
+            cmap_choice = "viridis"
+
+        # 4. Global plotting code that works for both branches
         ax.plot_surface(
             grid_x,
             grid_y,
             prediction_surface,
             alpha=0.75,
-            cmap="viridis",
+            cmap=cmap_choice,
         )
 
         ax.set_xlabel(input_x)
         ax.set_ylabel(input_y)
-        ax.set_zlabel(
-            f"Predicted next {output_variable}"
-        )
-
-        ax.set_title(
-            f"Polynomial response surface\n"
-            f"{output_variable} from {input_x} and {input_y}"
-        )
+        ax.set_zlabel(z_label_text)
+        ax.set_title(title_text)
 
         self.draw()
+
 
 
 # ============================================================
@@ -1397,8 +1391,9 @@ class StudyDashboard(QMainWindow):
 
         self.nonlinear_output_combo = QComboBox()
         self.nonlinear_output_combo.addItems(
-            self.variables
+            self.variables,
         )
+        self.nonlinear_output_combo.addItem("utility")
 
         self.nonlinear_fit_button = QPushButton(
             "Fit polynomial dynamics model"

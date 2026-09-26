@@ -1,13 +1,8 @@
 #This has all moved to dashboard.py, nothing is really new here
 
-
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import Ridge
-from sklearn.metrics import mean_squared_error, r2_score
 
 df = pd.read_csv("study.csv")
 
@@ -32,7 +27,7 @@ print(pd.DataFrame(A, index=variables, columns=variables))
 #Happiness -0.364941 -0.464152   0.082586  0.064304
 #Stress     0.235414  2.405885   0.535228 -0.955344
 
-#Row Velocity - Col Happiness means how much tomorrows V changes per unit of Happiness; ceteris paribus
+#Row Velocity - Col Happiness means how much tomorrows V changes per unit of Happiness; if everything else was 0
 
 print("")
 print("Baseline vector:")
@@ -71,38 +66,3 @@ print(pd.Series(equilibrium, index=variables))
 #Happiness    4.662390
 #Stress       3.200463
 #this means our baseline is 4.77, 2.72, 4.66, 3.2
-
-#Now we're going to test if it is nonlinear
-
-model = make_pipeline(
-    PolynomialFeatures(degree=2, include_bias=False),
-    Ridge(alpha=1.0)
-)
-model.fit(X, Y)
-predictions = model.predict(X)
-
-
-poly_step = model.named_steps['polynomialfeatures']
-ridge_step = model.named_steps['ridge']
-
-feature_names = poly_step.get_feature_names_out(input_features=variables)
-
-print("=== Overall System Performance ===")
-print(f"Total System R²: {r2_score(Y, predictions):.4f}")
-print(
-    f"Total System RMSE: {np.sqrt(mean_squared_error(Y, predictions)):.4f}\n"
-)
-
-for i, target in enumerate(variables):
-    print(f"\n--- Target Variable: {target} ---")
-
-    y_true = Y.iloc[:, i]
-    y_pred = predictions[:, i]
-
-    print(f"R² Score:  {r2_score(y_true, y_pred):.4f}")
-    print(f"RMSE:      {np.sqrt(mean_squared_error(y_true, y_pred)):.4f}")
-
-    print(f"Intercept: {ridge_step.intercept_[i]:.4f}")
-    print("Coefficients:")
-    for feature, coef in zip(feature_names, ridge_step.coef_[i]):
-        print(f"  {feature}: {coef:.4f}")
